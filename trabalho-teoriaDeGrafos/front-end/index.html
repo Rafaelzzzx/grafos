@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8 Graus de Network - UNESC</title>
+    <style>
+        :root {
+            --primary: #2ecc71;
+            --secondary: #27ae60;
+            --bg: #1a1a1a;
+            --text: #ffffff;
+            --card: #2d2d2d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--card);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1 { color: var(--primary); margin-bottom: 30px; }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: #444;
+            color: white;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        #btnBFS { background-color: var(--primary); color: white; }
+        #btnBFS:hover { background-color: var(--secondary); }
+
+        #btnBFS8 { background-color: #3498db; color: white; }
+        #btnBFS8:hover { background-color: #2980b9; }
+
+        #resultado {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #222;
+            min-height: 50px;
+            border-left: 5px solid var(--primary);
+            text-align: left;
+            display: none;
+        }
+
+        .caminho-item {
+            display: inline-block;
+            background: #444;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px;
+            font-size: 14px;
+        }
+
+        .seta { color: var(--primary); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>8 Graus de Network</h1>
+        <p>Encontre a conexão entre atores via filmes</p>
+
+        <div class="input-group">
+            <label for="origem">Ator de Origem:</label>
+            <input type="text" id="origem" placeholder="Ex: Zendaya" list="atores-list">
+        </div>
+
+        <div class="input-group">
+            <label for="destino">Ator de Destino:</label>
+            <input type="text" id="destino" placeholder="Ex: Rebecca Hall" list="atores-list">
+        </div>
+
+        <!-- Datalist que será preenchido pelo JavaScript -->
+        <datalist id="atores-list"></datalist>
+
+        <div class="buttons">
+            <button onclick="buscar(false)" id="btnBFS">Busca Curta (BFS)</button>
+            <button onclick="buscar(true)" id="btnBFS8">Busca Máx 8</button>
+        </div>
+
+        <div id="resultado"></div>
+    </div>
+
+    <script>
+        // Função para preencher o datalist assim que a página carrega
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/atores');
+                const atores = await response.json();
+                
+                const datalist = document.getElementById('atores-list');
+                
+                atores.forEach(ator => {
+                    const option = document.createElement('option');
+                    option.value = ator;
+                    datalist.appendChild(option);
+                });
+                
+                console.log(`✅ ${atores.length} atores carregados na lista!`);
+            } catch (error) {
+                console.error("❌ Erro ao carregar a lista do autocompletar:", error);
+            }
+        });
+
+        // Função do botão de busca
+       
+        async function buscar(isMax8) {
+    const origem = document.getElementById('origem').value;
+    const destino = document.getElementById('destino').value;
+    const resDiv = document.getElementById('resultado');
+
+    if (!origem || !destino) {
+        alert("Por favor, preencha os dois campos.");
+        return;
+    }
+
+    resDiv.style.display = 'block';
+    resDiv.innerHTML = "🔍 Buscando relacionamento...";
+
+    try {
+        // Agora envia o parâmetro max8 para o backend
+        const response = await fetch(`/api/buscar?origem=${encodeURIComponent(origem)}&destino=${encodeURIComponent(destino)}&max8=${isMax8}`);
+        const data = await response.json();
+
+        if (response.status === 404 || response.status === 500) {
+            resDiv.innerHTML = `<span style="color: #e74c3c;">❌ ${data.erro}</span>`;
+            if (data.estatisticas) {
+                resDiv.innerHTML += `<p style="color: #3498db; margin-top: 15px;"><strong>📊 Estatísticas do Grafo:</strong> ${data.estatisticas.totalVertices} vértices e ${data.estatisticas.totalArestas} arestas na base de dados.</p>`;
+            }
+            return;
+        }
+
+       let html = `<h3>Relacionamento Encontrado:</h3>`;
+        html += `<p><strong>Menor Caminho:</strong> ${data.comprimento} arestas</p>`;
+        
+        // Esta linha vai mostrar o total de rotas que o professor pediu
+        if (data.totalConexoes) {
+            html += `<p style="color: #e67e22;"><strong>🔗 Conexões Máximas Encontradas:</strong> Existem ${data.totalConexoes} rotas diferentes ligando estes atores!</p>`;
+        }
+        
+        const pathHtml = data.caminho.map((item, index) => {
+            return `<span class="caminho-item">${item}</span>` + 
+                   (index < data.caminho.length - 1 ? '<span class="seta"> → </span>' : '');
+        }).join('');
+
+        resDiv.innerHTML = html + `<div>${pathHtml}</div>`;;
+
+    } catch (error) {
+        resDiv.innerHTML = "❌ Erro ao conectar com o servidor.";
+    }
+}
+    </script>
+</body>
+</html>
